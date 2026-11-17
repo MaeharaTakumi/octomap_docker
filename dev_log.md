@@ -91,3 +91,14 @@ RViz の画面全体（走行後）：
   - 歩行者の当たったボクセルは 5 回の hit（0.1 m なら 0.5 s）で上限に達し、占有でなくなるには miss が 9 回要る（1 回だけ当たったボクセルなら 3 回）。
   - miss は光線がそのボクセルを通り抜けて奥（`max_range` 20 m 以内）の壁・床に当たったときだけ数える。奥が見えない向き・死角に残った跡は消えない。
   - 0.1 m（10 Hz で毎回積む）なら、見通せる場所の跡は 1 s 程度で消える見込み。0.05 m・1 Hz の間引きでは約 9 s かかる。
+
+### 4. 文書を整える
+
+- 目的：CLAUDE.md（厳守事項・構成・コンテナ・コマンド・注意）と README.md（使い方）を、localization と同じ書き方で書く。
+- やったこと：
+  - README：入っているもの・RTX 50xx の `MESA_LOADER_DRIVER_OVERRIDE=zink`・ホストの `xhost +local:`・作り方（compose と docker run）・起動の順・
+    コマンドと launch 引数の一覧・トピック・主なパラメータ・実機で使う場合・通信。項目 1 で README に入れ忘れていた zink の注意を足した。
+  - CLAUDE.md：厳守事項・コードの書き方・構成・コンテナ・よく使うコマンド（docker exec の注意）・OctoMap の性質と注意（項目 1〜3 の結果）。
+  - README がイメージに写るので、イメージを作り直してコンテナを入れ替えた（`docker compose build` → `up -d --force-recreate`）。
+- 結果：コンテナの `/root/octomap/README.md` がホストと一致。作り直した後も、octomap_server・rviz2 のソケットは全部 127.0.0.1 の UDP（TCP なし）、
+  239.255.0.1 にはどのインタフェースも参加していない。`glxinfo -B` の renderer は NVIDIA GeForce RTX 5080。
