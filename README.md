@@ -5,6 +5,14 @@
 
 （作成中。使い方は段階 4 で書き足す）
 
+## 使い方（Gazebo）
+Gazebo（`20261002`）と自己位置推定（`test`、`env:=gazebo`）を起動してから、コンテナの中で:
+```
+octomap              # env gazebo、RViz あり
+octomap gazebo false # RViz なし
+```
+`octomap_params [env]` で `config/param/<env>/params.yaml` を開く（ホストの `config/` と同じファイル。起動し直せば反映される）。
+
 ## Installation
 Docker 23.0 以降が必要
 
