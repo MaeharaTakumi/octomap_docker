@@ -13,6 +13,14 @@ octomap gazebo false # RViz なし
 ```
 `octomap_params [env]` で `config/param/<env>/params.yaml` を開く（ホストの `config/` と同じファイル。起動し直せば反映される）。
 
+launch を直接使うとき（`throttle`・`log_level` も付けられる）:
+```
+ros2 launch /root/octomap/config/octomap.launch.py env:=gazebo rviz:=true throttle:=false log_level:=info
+```
+* `throttle:=true`：点群を topic_tools の throttle で間引いてから octomap_server に渡す（レートは `params.yaml` の `cloud_throttle.msgs_per_sec`）。
+  解像度 0.05 m では 1 コアで間に合わない（点群の 8 割を捨てる）ので、1 Hz に間引く（`dev_log.md` の 3）
+* `log_level:=debug`：octomap_server が点群の挿入・地図の配信にかかった時間を出す
+
 ## Installation
 Docker 23.0 以降が必要
 

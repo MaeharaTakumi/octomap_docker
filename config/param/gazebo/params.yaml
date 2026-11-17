@@ -60,3 +60,13 @@ octomap_server:
 rviz2:
   ros__parameters:
     use_sim_time: true                  # Gazebo の /clock に従う
+
+# 点群の間引き（topic_tools の throttle。launch 引数 throttle:=true のときだけ起動し、octomap_server はその出力を購読する）。
+# throttle_type（messages）・input_topic・output_topic は launch が入れる（上部の定数 THROTTLE_TYPE・CLOUD_TOPIC・THROTTLED_TOPIC）。
+# 項目は topic_tools 1.1.2 の ros2 param list で確かめたもの
+cloud_throttle:
+  ros__parameters:
+    use_sim_time: true                  # Gazebo の /clock に従う
+    msgs_per_sec: 1.0                   # 通す点群の数 [1/s]
+    lazy: false                         # 購読者がいないときに入力の購読をやめる
+    use_wall_clock: false               # true なら sim time ではなく壁時計で間引く

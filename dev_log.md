@@ -48,3 +48,46 @@
 RViz の画面全体（走行後）：
 
 ![RViz の画面（走行後）](dev_log_images/stage2_rviz_window.png)
+
+### 3. 解像度・最大距離・点群の間引きを試す（Gazebo、slalom）
+
+- 目的：解像度（0.1 → 0.05 m）、最大距離、点群の間引きで、CPU と、`/octomap_full` の更新が点群（10 Hz）に間に合うかを見る。
+- やったこと：
+  - 1 回の試行：Gazebo → `test` の推定 → octomap（RViz あり、`log_level:=debug`）を起動し直し（空の地図から）、`drive_test.py gazebo slalom --yes` で走る間の 30 s（壁時計）を測った。
+    - 周期・遅れ：octomap コンテナで rclpy のノード（sim time）が `/velodyne_points`・`/octomap_full` を受け、sim time での周期と、遅れ＝受けたときの sim time − 地図の stamp（点群の stamp）を出す。
+    - CPU：ホストで `/proc/<pid>/stat` の utime + stime を 1 s ごとに読む（1 コア = 100 %）。
+    - 処理時間：octomap_server の DEBUG ログ「Pointcloud insertion ... done」「Map publishing ... took」。
+    - 測るための scratch のスクリプトはこのリポジトリに入れていない（構成の外）。
+  - launch に引数を 2 つ足した：`log_level`（octomap_server のロガーだけ。既定 info）、`throttle`（既定 false。true なら topic_tools の throttle で
+    `/velodyne_points` → `/velodyne_points_throttle` に間引いて octomap_server に渡す。レートは `params.yaml` の `cloud_throttle.msgs_per_sec`）。
+    throttle の実行ファイルは種類（`messages`）を最初の位置引数で受け取らないと「Throttle type is missing.」で終わるので、launch が `arguments` で渡す。
+- 結果（Gazebo の実時間比はどれも 0.99。点群は 10.5〜11.2 Hz で届く。Gazebo の 1〜3 ms 違いの組のため 10 を少し超える。1 点群 7,040 点）：
+
+| 解像度・最大距離・間引き | 地図の更新 [Hz]（/点群） | 遅れ 平均・p95 [s] | CPU（octomap_server） | 挿入 + 配信 [s/回] | `/octomap_full` 1 通 | CPU（rviz2） |
+|---|---|---|---|---|---|---|
+| **0.10 m・20 m・なし** | **10.61（1.00）** | **0.08・0.13** | **63 %**（最大 82） | 0.050 + 0.012 | 1.1 MB | 41 % |
+| 0.05 m・20 m・なし | 2.10（0.20） | 0.92・1.20 | 102 % | 0.247 + 0.225 | 20.0 MB | 64 % |
+| 0.05 m・10 m・なし | 2.29（0.21） | 0.88・1.06 | 101 % | 0.227 + 0.201 | 14.0 MB | 59 % |
+| 0.05 m・20 m・2 Hz | 1.61（0.15） | 1.68・3.16 | 93 % | 0.283 + 0.286 | 20.2 MB | 62 % |
+| 0.05 m・20 m・1 Hz | 0.98（0.09） | 0.59・0.72 | 56 % | 0.306 + 0.267 | 20.6 MB | 43 % |
+
+  - **0.1 m は点群ごとに地図を更新できる**（1 回 62 ms で 100 ms に収まる）。
+  - **0.05 m は 1 コアを使い切り、点群の 8 割を捨てる**。1 回の処理は挿入 約 0.25 s（OpenMP なしの liboctomap で 1 スレッド、項目 1）と
+    `/octomap_full` の配信 約 0.23 s（空きも含む地図全体を毎回送る。0.1 m の 18 倍の 20 MB）で、配信の分は地図が広がるほど伸びる。
+    MessageFilter の「queue is full」が 2.5 s ごとに出続けた（DEBUG で起動しなかった 1 回目の 0.05 m の試行では、同じく 2.1 Hz なのに 1 件も出なかった。
+    捨てた量は MessageFilter のログより、地図の更新数／点群の数で見る）。
+  - 最大距離 20 → 10 m はほとんど効かない（挿入 0.247 → 0.227 s）。廊下では、ほとんどの点が 10 m より近い。
+  - 間引き 2 Hz は 1 回の処理（0.57 s）が 0.5 s に収まらず、待ちが溜まって遅れがかえって増えた。**1 Hz なら間に合う**（遅れ 0.59 s、CPU 56 %）。
+    ただし 1 s に 1 回しか積まないので、0.05 m では床に走査線の輪の模様が残る（下の図の右）。
+  - params.yaml は指示の初期値（0.1 m・20 m）のまま。`cloud_throttle.msgs_per_sec` は 0.05 m で間に合う 1.0 にした（`throttle` の既定は false）。
+
+![解像度・最大距離・間引きと、更新の周期・遅れ・CPU・処理時間](dev_log_images/stage3_tuning.png)
+
+![走行後の地図（左 0.1 m、右 0.05 m。どちらも間引きなし）](dev_log_images/stage3_resolution.png)
+
+- 歩行者（gazebo_sfm_plugin）の跡：**実測は見送った**（ユーザー指示）。今の Gazebo の起動コマンドは `SC_10_4.world`（歩行者なし）で固定で、
+  歩行者のいる `school3F`（20 人）・`jireiken`（7 人）は launch でコメントアウトされている（既存側は編集しない。NDT の地図も SC10_4 のものだけ）。
+  見積もり（今の `sensor_model`）：ボクセルの対数オッズは hit +0.85（0.7）、miss −0.41（0.4）、上限 3.48（0.97）、占有の閾値は 0（0.5）。
+  - 歩行者の当たったボクセルは 5 回の hit（0.1 m なら 0.5 s）で上限に達し、占有でなくなるには miss が 9 回要る（1 回だけ当たったボクセルなら 3 回）。
+  - miss は光線がそのボクセルを通り抜けて奥（`max_range` 20 m 以内）の壁・床に当たったときだけ数える。奥が見えない向き・死角に残った跡は消えない。
+  - 0.1 m（10 Hz で毎回積む）なら、見通せる場所の跡は 1 s 程度で消える見込み。0.05 m・1 Hz の間引きでは約 9 s かかる。
