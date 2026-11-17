@@ -1,0 +1,62 @@
+# 環境 gazebo（ros2 launch /root/octomap/config/octomap.launch.py env:=gazebo）
+# octomap.launch.py がこのファイルを octomap_server と rviz2 の両方に渡す。どの項目も書いておく（書いていない項目をコードの既定値で動かさない）。
+# 項目と既定値（コメントの「既定」）は octomap_server 2.3.1（ros-humble-octomap-server）を起動し、ros2 param list・describe・get で確かめたもの。
+# 実機では param/<色>/params.yaml を足す（use_sim_time: false、base_frame_id: base_link など）。
+
+octomap_server:
+  ros__parameters:
+    use_sim_time: true                  # Gazebo の /clock に従う（既定 false）
+
+    # ---------- フレーム ----------
+    frame_id: map                       # 地図の基準（既定 map）
+    base_frame_id: base_footprint       # 車体（地面の除去・高さの地図の基準。既定 base_footprint）
+
+    # ---------- 地図 ----------
+    resolution: 0.1                     # ボクセルの大きさ [m]（既定 0.05）
+    octomap_path: ""                    # 起動時に読む .bt / .ot（空なら空の地図から作る。既定 ""）
+    compress_map: true                  # 配信の前に可逆に圧縮する（既定 true）
+    latch: false                        # 地図を更新のたびではなく、まとめて配信する。走りながら作るので false（既定 true）
+
+    # ---------- センサモデル（確率で占有・空きを積み上げる） ----------
+    sensor_model:
+      max_range: 20.0                   # これより遠い点は占有にせず、そこまでを空きにする [m]（-1 なら無制限。既定 -1.0）
+      hit: 0.7                          # 点が当たったボクセルの占有確率（既定 0.7）
+      miss: 0.4                         # 光線が通り抜けたボクセルの占有確率（既定 0.4）
+      min: 0.12                         # 確率の下限（既定 0.12）
+      max: 0.97                         # 確率の上限（既定 0.97）
+
+    # ---------- 入れる点の範囲（frame_id の座標。地面の除去が有効なら base_frame_id の座標） ----------
+    point_cloud_min_x: -1.7976931348623157e+308   # 既定 -DBL_MAX
+    point_cloud_max_x: 1.7976931348623157e+308    # 既定 DBL_MAX
+    point_cloud_min_y: -1.7976931348623157e+308   # 既定 -DBL_MAX
+    point_cloud_max_y: 1.7976931348623157e+308    # 既定 DBL_MAX
+    point_cloud_min_z: -100.0           # 既定 -100.0（範囲 -100〜100）
+    point_cloud_max_z: 100.0            # 既定 100.0（範囲 -100〜100）
+    occupancy_min_z: -100.0             # 配信する地図に入れる占有ボクセルの高さの下限（既定 -100.0）
+    occupancy_max_z: 100.0              # 同じく上限（既定 100.0）
+
+    # ---------- 地面の除去（base_frame_id の座標で平面を探す） ----------
+    filter_ground_plane: false          # 既定 false
+    ground_filter:
+      distance: 0.04                    # 地面とみなす点の平面からの距離 [m]（既定 0.04）
+      angle: 0.15                       # 地面とみなす平面の傾きの許容 [rad]（既定 0.15）
+      plane_distance: 0.07              # z=0 からの平面の距離の許容 [m]（既定 0.07）
+
+    # ---------- 配信・表示 ----------
+    filter_speckles: false              # 隣の無い孤立したボクセルを消す（既定 false）
+    max_depth: 16                       # マーカーを作るときに木をたどる深さ（16 で最小の解像度。既定 16）
+    publish_free_space: false           # 空きのボクセルもマーカーで配信する（既定 false）
+    use_height_map: false               # マーカーを高さで色分けする（既定 false）
+    color_factor: 0.8                   # 高さの色分けの係数（既定 0.8）
+    colored_map: false                  # 色付きの地図（color_octomap_server_node 用。既定 false）
+    color: {r: 0.0, g: 0.0, b: 1.0, a: 1.0}        # 占有のマーカーの色（既定 青）
+    color_free: {r: 0.0, g: 1.0, b: 0.0, a: 1.0}   # 空きのマーカーの色（既定 緑）
+
+    # ---------- 2D の地図（/projected_map。範囲外だが項目は書いておく） ----------
+    incremental_2D_projection: false    # 既定 false
+    min_x_size: 0.0                     # 既定 0.0
+    min_y_size: 0.0                     # 既定 0.0
+
+rviz2:
+  ros__parameters:
+    use_sim_time: true                  # Gazebo の /clock に従う

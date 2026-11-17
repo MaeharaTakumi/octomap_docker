@@ -1,0 +1,29 @@
+# terminalのリロード
+alias reload='exec $SHELL -l'
+
+#=========================OctoMap============================
+# 設定（launch・param・rviz）の場所。ホストの Docker/octomap/config を割り当てたもの
+OCTOMAP_CONFIG=/root/octomap/config
+
+# 環境（config/param/<env>/params.yaml）があるか確かめる。入力：環境の名前。出力：無ければエラーを表示して 1
+octomap_env_check() {
+  if [ ! -f "${OCTOMAP_CONFIG}/param/$1/params.yaml" ]; then
+    echo "Error: no environment \"$1\". Available: $(cd "${OCTOMAP_CONFIG}/param" && ls -d */ | tr -d / | tr '\n' ' ')"
+    return 1
+  fi
+}
+
+# OctoMap を作って表示する（octomap_server と rviz2）。octomap [env（既定 gazebo）] [rviz（true（既定）|false）]
+octomap() {
+  local env=${1:-gazebo}
+  octomap_env_check "$env" || return 1
+  ros2 launch "${OCTOMAP_CONFIG}/octomap.launch.py" env:="$env" rviz:="${2:-true}"
+}
+
+# params変更：環境の params.yaml（octomap_server・rviz2 の節）を開く。octomap_params [env（既定 gazebo）]
+# ホストの config/ と同じファイルなので、保存して octomap を起動し直せば反映される（ビルドは要らない）
+octomap_params() {
+  local env=${1:-gazebo}
+  octomap_env_check "$env" || return 1
+  code "${OCTOMAP_CONFIG}/param/${env}/params.yaml"
+}

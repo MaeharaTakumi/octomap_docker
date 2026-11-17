@@ -1,0 +1,4 @@
+# ビルドに要らない（config/ は docker-compose.yml で割り当てる）
+config/
+dev_log*
+.git
